@@ -1,5 +1,6 @@
 import tkinter
 import customtkinter
+import re
 # from pytube import YouTube
 from pytubefix import YouTube
 
@@ -8,27 +9,54 @@ from pytubefix import YouTube
 def startDownload():
     try:
         ytLink = link.get()
-        ytObject = YouTube(ytLink, on_progress_callback=on_progress)
-        video = ytObject.streams.get_highest_resolution()
+        # Remove any trailing whitespace and validate URL format
+        ytLink = ytLink.strip()
+        
+        # Remove @ symbol if it's at the beginning of the URL
+        if ytLink.startswith('@'):
+            ytLink = ytLink[1:]
+            
+        # Extract video ID from various YouTube URL formats
+        video_id = None
+        
+        # Pattern for youtube.com/watch?v=VIDEO_ID
+        watch_pattern = r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)'
+        match = re.search(watch_pattern, ytLink)
+        
+        if match:
+            video_id = match.group(1)
+            # Reconstruct a clean YouTube URL
+            ytLink = f"https://www.youtube.com/watch?v={video_id}"
+            
+            # Create the YouTube object with progress callback
+            ytObject = YouTube(ytLink, on_progress_callback=on_progress)
+            video = ytObject.streams.get_highest_resolution()
 
-        title.configure(text=ytObject.title, text_color="white")
-        finishLabel.configure(text="")
-        video.download()
-        finishLabel.configure(text="Downloaded!")
-    except:
-        finishLabel.configure(text="Youtube link is invalid", text_color="red")
+            title.configure(text=ytObject.title, text_color="white")
+            finishLabel.configure(text="")
+            video.download()
+            finishLabel.configure(text="Downloaded!", text_color="green")
+        else:
+            finishLabel.configure(text="Please enter a valid YouTube video URL", text_color="red")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        finishLabel.configure(text=f"Download failed: {str(e)}", text_color="red")
     
 def on_progress(stream, chunk, bytes_remaining):
-    total_size = stream.filesize
-    bytes_downloaded = total_size - bytes_remaining
-    percentage_of_completion = bytes_downloaded / total_size * 100
-    per = str(int(percentage_of_completion))
-    progressPercentage.configure(text = per + "%")
-    progressPercentage.update()
-
-# update progress bar
-
-    progressBar.set(float(percentage_of_completion) / 100 )
+    try:
+        total_size = stream.filesize
+        if total_size > 0:  # Ensure we don't divide by zero
+            bytes_downloaded = total_size - bytes_remaining
+            percentage_of_completion = bytes_downloaded / total_size * 100
+            per = str(int(percentage_of_completion))
+            progressPercentage.configure(text = per + "%")
+            progressPercentage.update()
+            # update progress bar
+            progressBar.set(float(percentage_of_completion) / 100)
+    except Exception as e:
+        print(f"Progress callback error: {str(e)}")
+        # Don't update UI on error to avoid crashes
+        pass
 
 # system settings
 customtkinter.set_appearance_mode("dark")
